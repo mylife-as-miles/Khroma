@@ -14,7 +14,7 @@ const instrumentSans = Instrument_Sans({
 
 export const metadata: Metadata = {
   title: `${APP_NAME}`,
-  description: 'Askable — chat with your CSVs using OpenRouter',
+  description: 'Khroma — chat with your CSVs using OpenRouter',
   openGraph: {
   images: ['/og.jpg'],
   },

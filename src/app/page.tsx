@@ -22,7 +22,7 @@ export interface SuggestedQuestion {
   text: string;
 }
 
-function AskableClient({
+function KhromaClient({
   setIsLoading,
   onUploadSuccess,
   heroHidden = false,
@@ -271,7 +271,7 @@ function AskableClient({
   );
 }
 
-export default function Askable() {
+export default function Khroma() {
   const [isLoading, setIsLoading] = useState(false);
   const [hideHero, setHideHero] = useState(false);
 
@@ -298,7 +298,7 @@ export default function Askable() {
             </div>
           )}
           <Suspense fallback={<div>Loading...</div>}>
-            <AskableClient
+            <KhromaClient
               setIsLoading={setIsLoading}
               onUploadSuccess={() => setHideHero(true)}
               heroHidden={hideHero}

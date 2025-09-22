@@ -51,6 +51,6 @@ export type UploadedFile = {
   csvRows?: { [key: string]: string }[];
 };
 
-export const APP_NAME = "Askable";
+export const APP_NAME = "Khroma";
 
 export const EXAMPLE_FILE_URL = "/products-100.csv";

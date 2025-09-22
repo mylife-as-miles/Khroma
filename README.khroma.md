@@ -1,8 +1,8 @@
-# Askable
+# Khroma
 
 <div align="center">
-    <img src="./public/og.jpg" alt="Askable OG Image" width="500">
-    <h1>Askable</h1>
+    <img src="./public/og.jpg" alt="Khroma OG Image" width="500">
+    <h1>Khroma</h1>
     <p>
         <strong>Chat with your CSV files using AI.</strong> Upload a CSV, ask questions in plain English, and get instant, code-backed answers and visualizations.
     </p>
@@ -11,9 +11,9 @@
 ## Features
 
 - **Intuitive Chat Interface:** Ask questions about your data in a natural, conversational way.
-- **CSV Upload & Analysis:** Easily upload your CSV files. Askable analyzes the headers and content to understand your data's structure.
+- **CSV Upload & Analysis:** Easily upload your CSV files. Khroma analyzes the headers and content to understand your data's structure.
 - **AI-Powered Insights:** Leverages Large Language Models (LLMs) via OpenRouter to understand your questions and generate relevant insights.
-- **Code Generation:** For each answer, Askable generates the Python code (using libraries like Pandas) that would be used to retrieve and process the data. **Note:** The code is generated for transparency and educational purposes but is not executed within the app.
+- **Code Generation:** For each answer, Khroma generates the Python code (using libraries like Pandas) that would be used to retrieve and process the data. **Note:** The code is generated for transparency and educational purposes but is not executed within the app.
 - **Smart Suggestions:** Provides suggested questions to help you get started with your data exploration.
 - **Chat History:** Your conversations are saved, allowing you to revisit previous insights.
 
@@ -31,7 +31,7 @@
 
 ## Getting Started
 
-Follow these instructions to set up and run Askable on your local machine.
+Follow these instructions to set up and run Khroma on your local machine.
 
 ### Prerequisites
 
@@ -46,8 +46,8 @@ Follow these instructions to set up and run Askable on your local machine.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/askable.git
-cd askable
+git clone https://github.com/your-username/khroma.git
+cd khroma
 ```
 
 ### 2. Install Dependencies
@@ -108,7 +108,7 @@ Start the Next.js development server. The `--turbopack` flag is recommended for 
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to use Askable.
+Open [http://localhost:3000](http://localhost:3000) in your browser to use Khroma.
 
 ---
 

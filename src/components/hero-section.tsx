@@ -7,7 +7,7 @@ export function HeroSection() {
   return (
   <div className="w-full flex flex-col md:flex-row items-center md:items-start md:justify-between gap-10 px-4 sm:px-6">
       <div className="max-w-xl flex flex-col items-center md:items-start">
-        <img src="/logo.svg" alt="Askable" className="size-10 mb-6" />
+        <img src="/logo.svg" alt="Khroma" className="size-10 mb-6" />
 
         {/* Badges */}
   <div className="flex items-center divide-x divide-border mb-4 text-xs text-muted-foreground rounded-full border bg-card/70 backdrop-blur overflow-hidden">
