@@ -14,27 +14,20 @@ export type DbMessage = AIMsg & {
 
 type ChatData = {
   messages: DbMessage[];
-  datasetId: string | null;
   fileName: string | null;
-  csvHeaders: string[] | null;
-  csvRows: { [key: string]: string }[] | null;
-  title: string | null; // inferring the title of the chat based on csvHeaders and first user messages
+  title: string | null;
+  csvHeaders: string[] | null; // Re-adding headers
   createdAt?: Date;
-  // ...future fields
 };
 
 export async function createChat({
   userQuestion,
-  csvHeaders,
-  csvRows,
-  datasetId,
   fileName,
+  csvHeaders, // Re-adding headers
 }: {
   userQuestion: string;
-  csvHeaders: string[];
-  csvRows: { [key: string]: string }[];
-  datasetId: string;
   fileName: string;
+  csvHeaders: string[]; // Re-adding headers
 }): Promise<string> {
   const id = generateId();
 
@@ -44,7 +37,7 @@ export async function createChat({
     if (process.env.OPENROUTER_API_KEY) {
       const { text: generatedTitle } = await generateText({
         model: openRouterClient.languageModel("meta-llama/Llama-3.3-70B-Instruct-Turbo"),
-        prompt: generateTitlePrompt({ csvHeaders, userQuestion }),
+        prompt: generateTitlePrompt({ userQuestion }), // Pass only userQuestion
         maxTokens: 100,
       });
       title = generatedTitle;
@@ -56,11 +49,9 @@ export async function createChat({
 
   const initial: ChatData = {
     messages: [],
-    csvHeaders,
-    csvRows,
-    datasetId,
     fileName,
     title,
+    csvHeaders, // Re-adding headers
     createdAt: new Date(),
   };
   try {
@@ -94,7 +85,7 @@ export async function saveNewMessage({
 }: {
   id: string;
   message: DbMessage;
-  chatData?: Partial<ChatData>;
+  chatData?: Partial<Pick<ChatData, 'fileName' | 'csvHeaders'>>; // Update partial type
 }): Promise<void> {
   try {
     const chat = await loadChat(id);
@@ -115,11 +106,9 @@ export async function saveNewMessage({
       // If chat does not exist, create a new one with this message
       const newChat: ChatData = {
         messages: [message],
-        csvHeaders: chatData?.csvHeaders || null,
-        csvRows: chatData?.csvRows || null,
-        datasetId: chatData?.datasetId || null,
         fileName: chatData?.fileName || null,
         title: null,
+        csvHeaders: chatData?.csvHeaders || null, // Add to new chat creation
       };
       try {
         await runQuery("INSERT INTO chats (id, data) VALUES (?, ?)", [

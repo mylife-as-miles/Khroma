@@ -1,5 +1,6 @@
 import mysql from 'mysql2/promise';
 import { createOpenAI } from "@ai-sdk/openai";
+import { createJina } from 'jina-ai-provider';
 
 export const openRouterClient = createOpenAI({
   apiKey: process.env.OPENROUTER_API_KEY || "",
@@ -9,6 +10,16 @@ export const openRouterClient = createOpenAI({
   },
   baseURL: "https://openrouter.ai/api/v1",
 });
+
+// New, correctly configured OpenAI provider for embeddings
+export const openai = createOpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+
+export const jina = createJina({
+    apiKey: process.env.JINA_API_KEY,
+});
+
 
 type Pool = mysql.Pool;
 

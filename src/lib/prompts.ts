@@ -1,22 +1,8 @@
 export const generateCodePrompt = ({
   csvHeaders,
-  csvRows,
 }: {
   csvHeaders?: string[];
-  csvRows?: { [key: string]: string }[];
 }) => {
-  // Prepare sample rows as a markdown table if available
-  let sampleRowsSection = "";
-  if (csvRows && csvRows.length > 0 && csvHeaders && csvHeaders.length > 0) {
-    const sampleRows = csvRows.slice(0, 3);
-    const headerRow = `| ${csvHeaders.join(" | ")} |`;
-    const separatorRow = `|${csvHeaders.map(() => "---").join("|")}|`;
-    const dataRows = sampleRows
-      .map((row) => `| ${csvHeaders.map((h) => row[h] ?? "").join(" | ")} |`)
-      .join("\n");
-    sampleRowsSection = `\n\nHere are a few sample rows from the dataset:\n\n${headerRow}\n${separatorRow}\n${dataRows}`;
-  }
-
   return `
 You are an expert data scientist assistant that writes python code to answer questions about a dataset.
 
@@ -25,7 +11,6 @@ You are given a question about a dataset. The dataset has been pre-loaded into a
 The dataset has the following columns: ${
     csvHeaders?.join(", ") || "[NO HEADERS PROVIDED]"
   }
-${sampleRowsSection}
 
 You must always write python code that:
 - Assumes the data is in a pandas DataFrame named \`df\`. Do NOT try to load the data from a file.
@@ -72,23 +57,16 @@ Python sessions come pre-installed with the following dependencies, any other de
 };
 
 export const generateTitlePrompt = ({
-  csvHeaders,
   userQuestion,
 }: {
-  csvHeaders?: string[];
   userQuestion: string;
 }) => {
   return `
-You are an expert data scientist assistant that creates titles for chat conversations.
+You are an expert assistant that creates short, concise titles for chat conversations.
 
-You are given a dataset and a question.
+The user's first question is: "${userQuestion}"
 
-The dataset has the following columns: ${
-    csvHeaders?.join(", ") || "[NO HEADERS PROVIDED]"
-  }
-
-The question from the user is: ${userQuestion}
-
+Based on the user's question, create a title for the conversation.
 Return ONLY the title of the chat conversation, with no quotes or extra text, and keep it super short (maximum 5 words). Do not return anything else.
 `;
 };
@@ -115,3 +93,39 @@ Example format:
 [{"id": "q1", "text": "What is the average price by category?"}, {"id": "q2", "text": "How many items sold per month?"}]
 
 Do not wrap the array in any additional object or key like "elements". Return the array directly.`;
+};
+
+export const generateRouterPrompt = ({
+    userQuestion,
+  }: {
+    userQuestion: string;
+  }) => {
+    return `
+You are an intelligent routing agent. Your purpose is to analyze a user's question about a product catalog and determine the best tool to answer it.
+
+Based on the user's question, you must classify the intent and extract any relevant parameters.
+
+The available intents are:
+- "semantic_search": Use this when the user is asking to find items that are similar in meaning to a given product name or description. For example: "Find products similar to the 'Compact Printer Air'".
+- "image_search": Use this when the user is asking to find items based on a visual description. For example: "Show me items that look like a 'red and black gaming chair'".
+- "price_prediction": Use this when the user asks for a price prediction based on new or modified product specifications. For example: "What would be the price of a 'Smart Blender' but with a steel finish?".
+- "general_question": Use this for any other question that does not fit the above categories, such as asking for python code, general data analysis, or a simple greeting.
+
+You must return a single JSON object with the following structure:
+{
+  "intent": "...",
+  "parameters": {
+    "query": "..."
+  }
+}
+
+The "query" in the parameters object should be the core subject of the user's question. For example:
+- If the question is "Find products similar to the 'Compact Printer Air'", the query should be "Compact Printer Air".
+- If the question is "Show me items that look like a 'red and black gaming chair'", the query should be "red and black gaming chair".
+- If the question is "What would a steel version of the Smart Blender cost?", the query should be "steel version of the Smart Blender".
+
+User's question: "${userQuestion}"
+
+Return ONLY the JSON object. Do not include any other text or explanations.
+`;
+  };

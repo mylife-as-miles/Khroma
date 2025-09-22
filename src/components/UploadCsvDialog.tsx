@@ -10,78 +10,89 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { cn, EXAMPLE_FILE_URL } from "@/lib/utils";
-import { FileSpreadsheet, UploadCloud, ShieldCheck, Gauge, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { FileSpreadsheet, UploadCloud, ShieldCheck, Gauge, CheckCircle2, Image as ImageIcon, AlertTriangle } from "lucide-react";
 
 interface UploadCsvDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onFileSelected: (file: File | null) => void;
+  onFileSelected: (csvFile: File, imageFiles: File[]) => void;
   loading?: boolean;
   fileName?: string | null;
+  imageFileCount?: number;
   fileSize?: number | null;
   step?: "idle" | "reading" | "saving" | "generating" | "done";
   headers?: string[];
   sampleRows?: { [key: string]: string }[];
 }
 
-export function UploadCsvDialog({ open, onOpenChange, onFileSelected, loading = false, fileName, fileSize, step = "idle", headers = [], sampleRows = [] }: UploadCsvDialogProps) {
+export function UploadCsvDialog({
+  open,
+  onOpenChange,
+  onFileSelected,
+  loading = false,
+  fileName,
+  imageFileCount = 0,
+  fileSize,
+  step = "idle",
+  headers = [],
+  sampleRows = [],
+}: UploadCsvDialogProps) {
   const handleDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles?.[0];
-    if (!file) {
-      toast.warning("Please select a CSV file");
+    const csvFile = acceptedFiles.find(f => f.name.toLowerCase().endsWith('.csv'));
+    const imageFiles = acceptedFiles.filter(f => !f.name.toLowerCase().endsWith('.csv'));
+
+    if (!csvFile) {
+      toast.warning("A CSV file is required.");
+      return;
+    }
+    if (imageFiles.length === 0) {
+        toast.warning("Please select at least one image file.");
+        return;
+    }
+
+    if (csvFile.size > 30 * 1024 * 1024) {
+      toast.warning("CSV file size must be less than 30MB");
       return;
     }
 
-    // Accept common CSV MIME types and also fall back to .csv extension check
-    const allowedMimeTypes = ["text/csv", "application/vnd.ms-excel", "text/plain", ""];
-    const isCsv = allowedMimeTypes.includes(file.type) || file.name.toLowerCase().endsWith(".csv");
-
-    if (!isCsv) {
-      toast.warning("Only .csv files are supported");
-      return;
-    }
-
-    if (file.size > 30 * 1024 * 1024) {
-      toast.warning("File size must be less than 30MB");
-      return;
-    }
-
-    onFileSelected(file);
+    onFileSelected(csvFile, imageFiles);
   }, [onFileSelected]);
 
-  const onUseExample = useCallback(async () => {
-    try {
-      const response = await fetch(EXAMPLE_FILE_URL);
-      const blob = await response.blob();
-      const file = new File([blob], "products.csv", { type: "text/csv" });
-  onFileSelected(file);
-    } catch (error) {
-      toast.error("Failed to load example CSV");
-    }
-  }, [onFileSelected, onOpenChange]);
+  // const onUseExample = useCallback(async () => {
+  //   // This functionality is temporarily disabled as it doesn't include images.
+  //   toast.info("Example CSV functionality is disabled for multimodal search.");
+  // }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-[920px] max-h-[90svh] p-0 overflow-hidden md:overflow-visible border border-border/40 shadow-[0_10px_40px_rgba(2,6,23,0.2)] rounded-2xl bg-popover/90 backdrop-blur-xl text-popover-foreground">
         {/* Header banner */}
-  <div className="relative text-popover-foreground p-6">
+        <div className="relative text-popover-foreground p-6">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600" />
           <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(600px 200px at 10% 0%, rgba(255,255,255,0.4), transparent)" }} />
           <div className="relative">
           <DialogHeader>
-            <DialogTitle className="text-xl md:text-2xl tracking-tight">Upload your CSV</DialogTitle>
+            <DialogTitle className="text-xl md:text-2xl tracking-tight">Upload Your Product Data</DialogTitle>
             <DialogDescription className="text-popover-foreground/80">
-              Drag and drop a CSV up to 30MB. We’ll parse headers and sample rows to kickstart your analysis.
+              Drag & drop a CSV and product images. Images must be named with the product's ID (e.g., 56.jpg).
             </DialogDescription>
           </DialogHeader>
           {!!fileName && (
             <div className="mt-3 flex flex-col gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-accent/40 px-3 py-1 text-sm text-accent-foreground">
-                <FileSpreadsheet className="size-4" />
-                <span className="truncate max-w-[220px]" title={fileName}>{fileName}</span>
-                {typeof fileSize === 'number' && (
-                  <span className="text-popover-foreground/80">· {(fileSize / (1024 * 1024)).toFixed(2)} MB</span>
+              <div className="flex flex-wrap gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-accent/40 px-3 py-1 text-sm text-accent-foreground">
+                  <FileSpreadsheet className="size-4" />
+                  <span className="truncate max-w-[220px]" title={fileName}>{fileName}</span>
+                  {typeof fileSize === 'number' && (
+                    <span className="text-popover-foreground/80">· {(fileSize / (1024 * 1024)).toFixed(2)} MB</span>
+                  )}
+                </div>
+                {imageFileCount > 0 && (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-accent/40 px-3 py-1 text-sm text-accent-foreground">
+                        <ImageIcon className="size-4" />
+                        <span>{imageFileCount} image{imageFileCount > 1 ? 's' : ''}</span>
+                    </div>
                 )}
               </div>
               {/* Stepper */}
@@ -96,9 +107,9 @@ export function UploadCsvDialog({ open, onOpenChange, onFileSelected, loading = 
                     done: 4,
                   };
                   const STEPS: { key: Exclude<Step, "idle" | "done">; label: string }[] = [
-                    { key: "reading", label: "Reading headers" },
-                    { key: "saving", label: "Saving locally" },
-                    { key: "generating", label: "Generating questions" },
+                    { key: "reading", label: "Reading files" },
+                    { key: "saving", label: "Processing data" },
+                    { key: "generating", label: "Generating embeddings" },
                   ];
                   return STEPS.map(({ key, label }) => {
                     const done = order[step as Step] > order[key];
@@ -118,43 +129,44 @@ export function UploadCsvDialog({ open, onOpenChange, onFileSelected, loading = 
         </div>
 
         {/* Body */}
-  <div className="p-4 md:p-6">
+        <div className="p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-start">
             {/* Features column */}
             <div className="md:col-span-2 flex flex-col gap-4">
+              <div className="flex items-start gap-3 text-amber-600">
+                <AlertTriangle className="size-5 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-500">Important Requirement</p>
+                  <p className="text-xs text-amber-600/80">Image files must be named after the product ID from the CSV (e.g., '56.jpg').</p>
+                </div>
+              </div>
               <div className="flex items-start gap-3">
                 <ShieldCheck className="size-5 text-green-600 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-foreground">Private by default</p>
-                  <p className="text-xs text-muted-foreground">Your file is only used to answer your questions.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Gauge className="size-5 text-indigo-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Fast preview</p>
-                  <p className="text-xs text-muted-foreground">We analyze headers and a small sample, not the entire file.</p>
+                  <p className="text-xs text-muted-foreground">Your files are processed to create embeddings.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <FileSpreadsheet className="size-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-foreground">CSV only</p>
-                  <p className="text-xs text-muted-foreground">Support for XLSX coming soon.</p>
+                  <p className="text-sm font-medium text-foreground">CSV & Images</p>
+                  <p className="text-xs text-muted-foreground">Requires one CSV and one or more images.</p>
                 </div>
               </div>
-
-              <div className="mt-2">
-                <Button variant="outline" onClick={onUseExample} className="gap-2 w-full md:w-auto" disabled={loading}>
-                  Try example CSV
-                </Button>
+              <div className="flex items-start gap-3 text-amber-600">
+                <AlertTriangle className="size-5 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Image Naming Requirement</p>
+                  <p className="text-xs text-amber-600/80">Image files must be named after the 'Internal ID' or 'Index' from the CSV (e.g., '56.jpg', '29.png').</p>
+                </div>
               </div>
             </div>
 
             {/* Dropzone + Preview column */}
             <div className="md:col-span-3">
               {!loading ? (
-                <Dropzone multiple={false} accept={{ "text/csv": [".csv"] }} onDrop={handleDrop}>
+                <Dropzone multiple={true} accept={{ "text/csv": [".csv"], "image/*": [".jpeg", ".jpg", ".png", ".webp"] }} onDrop={handleDrop}>
                   {({ getRootProps, getInputProps, isDragActive }) => (
                     <div
                       {...getRootProps()}
@@ -172,9 +184,9 @@ export function UploadCsvDialog({ open, onOpenChange, onFileSelected, loading = 
                           <UploadCloud className={cn("size-6", isDragActive ? "text-blue-700" : "text-muted-foreground")} />
                         </div>
                         <p className="text-sm md:text-base text-foreground font-medium">
-                          {isDragActive ? "Drop your CSV here" : "Drag & drop your CSV or click to browse"}
+                          {isDragActive ? "Drop your files here" : "Drag & drop your CSV and images"}
                         </p>
-                        <p className="text-xs text-muted-foreground">Max 30MB • .csv only</p>
+                        <p className="text-xs text-muted-foreground">Or click to browse</p>
                       </div>
                     </div>
                   )}
@@ -184,8 +196,8 @@ export function UploadCsvDialog({ open, onOpenChange, onFileSelected, loading = 
                   <div className="flex items-center gap-3">
                     <div className="size-10 rounded-full border-2 border-blue-500/40 border-t-transparent animate-spin" />
                     <div>
-                      <p className="text-sm font-medium text-foreground">Analyzing CSV…</p>
-                      <p className="text-xs text-muted-foreground">Reading headers, uploading and preparing suggestions.</p>
+                      <p className="text-sm font-medium text-foreground">Processing Data…</p>
+                      <p className="text-xs text-muted-foreground">Generating embeddings and indexing your products.</p>
                     </div>
                   </div>
                   <div className="mt-4 h-2 w-full bg-slate-200 rounded-full overflow-hidden">

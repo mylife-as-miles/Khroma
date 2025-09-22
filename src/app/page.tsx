@@ -2,12 +2,8 @@
 
 import React, { Suspense, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Header } from "@/components/header";
 import { AppSidebar } from "@/components/AppSidebar";
-// import { UploadArea } from "@/components/upload-area";
 import { HeroSection } from "@/components/hero-section";
-import { QuestionSuggestionCard } from "@/components/question-suggestion-card";
-import { extractCsvData } from "@/lib/csvUtils";
 import { createChat } from "@/lib/chat-store";
 import { PromptInput } from "@/components/PromptInput";
 import { toast } from "sonner";
@@ -15,12 +11,8 @@ import { useLLMModel } from "@/hooks/useLLMModel";
 import { redirect } from "next/navigation";
 import { UploadCsvDialog } from "@/components/UploadCsvDialog";
 import Loading from "./chat/[id]/loading";
-import { saveCsvToDB } from "@/lib/indexedDb";
 
-export interface SuggestedQuestion {
-  id: string;
-  text: string;
-}
+// SuggestedQuestion is no longer needed as the backend handles processing.
 
 function KhromaClient({
   setIsLoading,
@@ -32,81 +24,59 @@ function KhromaClient({
   heroHidden?: boolean;
 }) {
   const { selectedModelSlug } = useLLMModel();
-  const [localFile, setLocalFile] = useState<File | null>(null);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadStep, setUploadStep] = useState<
-    "idle" | "reading" | "saving" | "generating" | "done"
-  >("idle");
-  const [suggestedQuestions, setSuggestedQuestions] = useState<
-    SuggestedQuestion[]
-  >([]);
+  const [uploadStep, setUploadStep] = useState<"idle" | "reading" | "saving" | "generating" | "done">("idle");
   const [inputValue, setInputValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  // The concept of a client-side datasetId from IndexedDB is no longer the primary way.
+  // We can consider the dataset to be "live" after a successful upload.
+  const [isDatasetReady, setIsDatasetReady] = useState(false);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-  const [csvRows, setCsvRows] = useState<{ [key: string]: string }[]>([]);
-  const [datasetId, setDatasetId] = useState<string | null>(null);
 
-  const handleFileUpload = useCallback(async (file: File | null) => {
-    if (!file) return;
+  const handleFileUpload = useCallback(async (csv: File, images: File[]) => {
+    if (!csv || images.length === 0) return;
 
-    setLocalFile(file);
+    setCsvFile(csv);
+    setImageFiles(images);
     setIsProcessing(true);
-    setUploadStep("reading");
+    setUploadStep("reading"); // "reading" can now mean "uploading"
+
+    const formData = new FormData();
+    formData.append('csv', csv);
+    images.forEach(image => {
+        formData.append('images', image);
+    });
 
     try {
-      const { headers, sampleRows } = await extractCsvData(file);
-
-      if (headers.length === 0 || sampleRows.length === 0) {
-        alert("Please upload a CSV with headers.");
-        setLocalFile(null);
-        setIsProcessing(false);
-        setUploadStep("idle");
-        return;
-      }
-
-      setCsvRows(sampleRows);
-      setCsvHeaders(headers);
-      setUploadStep("saving");
-
-      const newId = `csv-${Date.now()}`;
-      await saveCsvToDB({
-        id: newId,
-        headers,
-        rows: sampleRows, // Note: only storing sample rows for now as per original logic
-        fileName: file.name,
-      });
-
-  setDatasetId(newId);
-  toast.success("CSV saved locally. Ask a question →");
-  setUploadOpen(false);
-  // Hide hero section once upload is saved successfully, mirroring dialog close
-  onUploadSuccess?.();
-
-      setUploadStep("generating");
-      const response = await fetch("/api/generate-questions", {
+      setUploadStep("saving"); // "saving" can now mean "processing on backend"
+      const response = await fetch("/api/process-data", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ columns: headers }),
+        body: formData,
       });
+
+      const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(result.error || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      setSuggestedQuestions(data.questions);
-
+      setCsvHeaders(result.headers || []);
       setUploadStep("done");
+      toast.success(result.message || "Data processed successfully!");
+      setIsDatasetReady(true);
+      setUploadOpen(false);
+      onUploadSuccess?.(); // Hides the hero section
+
     } catch (error: any) {
-      console.error("Failed to process CSV file:", error);
-      toast.error("Failed to save/process CSV: " + (error?.message ?? "unknown error"));
+      console.error("Failed to process files:", error);
+      toast.error("Failed to process files: " + (error?.message ?? "unknown error"));
       setUploadStep("idle");
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [onUploadSuccess]);
 
   // Open dialog when clicking the hero "Upload CSV" button (#upload hash)
   React.useEffect(() => {
@@ -114,22 +84,18 @@ function KhromaClient({
       if (typeof window === "undefined") return;
       if (window.location.hash === "#upload") {
         setUploadOpen(true);
-        // remove the hash without reloading
         history.replaceState(null, "", window.location.pathname + window.location.search);
       }
     };
     openIfUploadHash();
     window.addEventListener("hashchange", openIfUploadHash);
-    // Also capture any direct clicks on anchors to #upload to open the dialog immediately
     const clickHandler = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      // Traverse up to find an anchor element
       const anchor = target.closest('a[href="#upload"]') as HTMLAnchorElement | null;
       if (anchor) {
         e.preventDefault();
         setUploadOpen(true);
-        // Clean the hash if the browser applied it
         if (typeof window !== "undefined") {
           history.replaceState(null, "", window.location.pathname + window.location.search);
         }
@@ -139,46 +105,27 @@ function KhromaClient({
     return () => window.removeEventListener("hashchange", openIfUploadHash);
   }, []);
 
-  const handleSuggestionClick = (question: string) => {
-    handleSendMessage(question);
-  };
-
   const handleSendMessage = async (messageText?: string) => {
     const text = messageText || inputValue.trim();
     if (!text) return;
 
-    if (!datasetId) {
-      toast.warning("Please upload a CSV file first.");
-      return;
-    }
-
-    if (csvHeaders.length === 0) {
-      toast.warning("Please upload a CSV with headers.");
-      return;
-    }
-
-    if (csvRows.length === 0) {
-      toast.warning("Please upload a CSV with data.");
+    if (!isDatasetReady) {
+      toast.warning("Please upload your product data first.");
       return;
     }
 
     localStorage.setItem("pendingMessage", text);
-
     setIsLoading(true);
 
-    if (!localFile) {
-      toast.warning("Cannot find file details.");
-      return;
-    }
-
+    // The chat creation logic is now simpler.
+    // It doesn't need to know about the CSV content, as the backend has it.
     const id = await createChat({
-      userQuestion: text, // it's not stored in db here just used for chat title!
+      userQuestion: text,
+      fileName: csvFile?.name || "Product Data",
       csvHeaders: csvHeaders,
-      datasetId: datasetId,
-      csvRows: csvRows,
-      fileName: localFile.name,
     });
-    // Persist chat id and basic metadata locally for history (works without DB)
+
+    // Persist chat id locally for history
     try {
       const key = "visitedChatIds";
       const metaKey = (id: string) => `chatMeta:${id}`;
@@ -187,16 +134,17 @@ function KhromaClient({
       const raw = localStorage.getItem(key);
       let ids: string[] = [];
       try { ids = JSON.parse(raw || "[]"); } catch {}
-      // add to front, ensure uniqueness
       ids = [id, ...ids.filter((x) => x !== id)].slice(0, 50);
       localStorage.setItem(key, JSON.stringify(ids));
       localStorage.setItem(
         metaKey(id),
-        JSON.stringify({ id, title, createdAt: now, fileName: localFile.name, modelSlug: selectedModelSlug })
+        JSON.stringify({ id, title, createdAt: now, fileName: csvFile?.name || "Product Data", modelSlug: selectedModelSlug })
       );
     } catch {}
-    // Pass datasetId via query so the chat page can reconstruct from IndexedDB when DB is unavailable
-    redirect(`/chat/${id}?model=${selectedModelSlug}&datasetId=${encodeURIComponent(datasetId)}`);
+
+    // The chat page no longer needs datasetId from the client,
+    // as the backend will handle the context.
+    redirect(`/chat/${id}?model=${selectedModelSlug}`);
   };
 
   return (
@@ -206,28 +154,29 @@ function KhromaClient({
         onOpenChange={setUploadOpen}
         onFileSelected={handleFileUpload}
         loading={isProcessing}
-        fileName={localFile?.name ?? null}
-        fileSize={localFile?.size ?? null}
+        fileName={csvFile?.name ?? null}
+        fileSize={csvFile?.size ?? null}
+        imageFileCount={imageFiles.length}
         step={uploadStep}
-        headers={csvHeaders}
-        sampleRows={csvRows}
+        // We no longer show a client-side preview, so headers/rows are not needed.
+        headers={[]}
+        sampleRows={[]}
       />
       {/* Large Input Area */}
-  {localFile && (
-    <div className={cn(
-            "w-full max-w-screen-lg lg:max-w-screen-xl mx-auto flex justify-center",
-            heroHidden ? "mt-6 md:mt-8" : ""
-          )}>
+      {isDatasetReady && (
+        <div className={cn(
+          "w-full max-w-screen-lg lg:max-w-screen-xl mx-auto flex justify-center",
+          heroHidden ? "mt-6 md:mt-8" : ""
+        )}>
           <PromptInput
             value={inputValue}
             onChange={setInputValue}
             onSend={() => {
               handleSendMessage(inputValue);
             }}
+            // The uploadedFile prop is simplified
             uploadedFile={{
-              name: localFile.name,
-              csvHeaders: csvHeaders,
-              csvRows: csvRows,
+              name: csvFile?.name || "Product Data",
             }}
             textAreaClassName="h-[120px] md:h-[140px]"
             isLLMAnswering={false}
@@ -235,38 +184,8 @@ function KhromaClient({
           />
         </div>
       )}
-      {/* Processing State */}
-      {isProcessing && (
-        <div className="w-full max-w-sm my-8 md:max-w-3xl mx-auto text-center">
-          <p className="text-muted-foreground text-sm mb-4 animate-pulse">
-            <span className="font-medium">Generating suggestions</span>{" "}
-            <span className="text-muted-foreground">...</span>
-          </p>
-          <div className="flex flex-col gap-3">
-            {Array.from({ length: 3 }).map((_, idx: number) => (
-              <QuestionSuggestionCard key={`loading-${idx}`} question={""} isLoading />
-            ))}
-          </div>
-        </div>
-      )}
-      {/* Suggestions */}
-      {suggestedQuestions.length > 0 && !isProcessing && (
-        <div className="w-full max-w-screen-lg lg:max-w-screen-xl my-10 mx-auto text-center">
-          <p className="text-muted-foreground text-sm mb-4 md:mb-5">
-            <span className="font-medium">Suggestions</span>{" "}
-            <span className="text-muted-foreground">based on your uploaded CSV:</span>
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 justify-items-stretch">
-            {suggestedQuestions.map((suggestion: SuggestedQuestion) => (
-              <QuestionSuggestionCard
-                key={suggestion.id}
-                question={suggestion.text}
-                onClick={() => handleSuggestionClick(suggestion.text)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Processing State is handled by the loading prop in the dialog */}
+      {/* Suggestions are removed as processing is now on the backend */}
     </>
   );
 }
@@ -280,7 +199,7 @@ export default function Khroma() {
   }
 
   return (
-  <div className="flex flex-col md:flex-row bg-background w-full flex-1 min-h-[100svh] md:h-screen overflow-hidden">
+    <div className="flex flex-col md:flex-row bg-background w-full flex-1 min-h-[100svh] md:h-screen overflow-hidden">
       <AppSidebar />
       <div className="flex flex-1">
         <div className="p-2 md:p-10 rounded-tl-2xl border border-border bg-card flex flex-col gap-2 flex-1 w-full h-full max-w-screen-2xl mx-auto">
