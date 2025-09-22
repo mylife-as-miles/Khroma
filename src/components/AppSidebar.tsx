@@ -19,7 +19,7 @@ const AppSidebarContent = ({ chatId }: { chatId?: string }) => {
   const links = [
     {
       label: "GitHub",
-      href: "https://github.com/mylife-as-miles/askable",
+      href: "https://github.com/mylife-as-miles/khroma",
       icon: (
         <Github className="text-sidebar-foreground h-5 w-5 flex-shrink-0" />
       ),
@@ -103,7 +103,7 @@ export const Logo = () => {
         animate={{ opacity: 1 }}
         className="font-medium text-foreground whitespace-pre"
       >
-        Askable
+        Khroma
       </motion.span>
     </Link>
   );

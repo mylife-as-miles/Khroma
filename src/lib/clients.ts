@@ -5,7 +5,7 @@ export const openRouterClient = createOpenAI({
   apiKey: process.env.OPENROUTER_API_KEY || "",
   headers: {
     "HTTP-Referer": process.env.OPENROUTER_REFERER || "",
-    "X-Title": process.env.OPENROUTER_TITLE || "Askable",
+    "X-Title": process.env.OPENROUTER_TITLE || "Khroma",
   },
   baseURL: "https://openrouter.ai/api/v1",
 });
